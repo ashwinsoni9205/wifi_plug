@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Plug Remote</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+
+<h2>Smart Plug (Remote)</h2>
+
+<button onclick="turnOn()">ON</button>
+<button onclick="turnOff()">OFF</button>
+
+<h3>Current: <span id="current">0</span></h3>
+<h3>Power: <span id="power">0</span></h3>
+<h3>Energy: <span id="energy">0</span></h3>
+
+<script>
+
+// 🔐 HiveMQ WebSocket URL
+const client = mqtt.connect(
+  "wss://0e66730e789d474d957d8738cc74ac60.s1.eu.hivemq.cloud:8884/mqtt",
+  {
+    username: "Wirelessplug_iiti1",
+    password: "Wirelessplug_iiti1"
+  }
+);
+
+client.on("connect", () => {
+  console.log("Connected to MQTT");
+
+  client.subscribe("smartplug/data");
+});
+
+client.on("message", (topic, message) => {
+  if (topic === "smartplug/data") {
+    let data = JSON.parse(message.toString());
+
+    document.getElementById("current").innerText = data.current.toFixed(2);
+    document.getElementById("power").innerText = data.power.toFixed(2);
+    document.getElementById("energy").innerText = data.energy.toFixed(3);
+  }
+});
+
+// 🔘 Control functions
+function turnOn() {
+  client.publish("smartplug/control", "1");
+}
+
+function turnOff() {
+  client.publish("smartplug/control", "0");
+}
+
+</script>
+
+</body>
+</html>
