@@ -9,6 +9,7 @@
 <h2>Smart Plug (Remote)</h2>
 
 <button id="toggleBtn" onclick="togglePlug()">OFF</button>
+<button onclick="resetFault()">Reset Fault</button>
 
 <h3>Current: <span id="current">0</span></h3>
 <h3>Power: <span id="power">0</span></h3>
@@ -56,9 +57,20 @@ client.on("message", (topic, message) => {
   }
 
  if (topic === "smartplug/fault") {
-  document.getElementById("status").innerText = "Overcurrent Trip";
-  fault = true;
-  isOn = false;
+
+  let msg = message.toString();
+
+  if (msg === "overcurrent") {
+    document.getElementById("status").innerText = "Overcurrent Trip";
+    fault = true;
+    isOn = false;
+  }
+
+  if (msg === "cleared") {
+    document.getElementById("status").innerText = "online";
+    fault = false;
+  }
+
   updateButton();
 }
   
@@ -91,7 +103,14 @@ function togglePlug() {
 }
 
 function updateButton() {
-  document.getElementById("toggleBtn").innerText = isOn ? "ON" : "OFF";
+  const btn = document.getElementById("toggleBtn");
+
+  btn.innerText = isOn ? "ON" : "OFF";
+  btn.disabled = fault;
+}
+
+function resetFault() {
+  client.publish("smartplug/reset", "1");
 }
 
 </script>
