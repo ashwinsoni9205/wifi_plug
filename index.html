@@ -8,13 +8,13 @@
 
 <h2>Smart Plug (Remote)</h2>
 
-<button onclick="turnOn()">ON</button>
-<button onclick="turnOff()">OFF</button>
+<button id="toggleBtn" onclick="togglePlug()">OFF</button>
+<button onclick="resetFault()">Reset Fault</button>
 
 <h3>Current: <span id="current">0</span></h3>
 <h3>Power: <span id="power">0</span></h3>
 <h3>Energy: <span id="energy">0</span></h3>
-<h3>Status: <span id="status">Unknown</span></h3>
+<h3>Plug Status: <span id="status">Unknown</span></h3>
 
 <script>
 
@@ -32,9 +32,13 @@ client.on("connect", () => {
 
   client.subscribe("smartplug/data");
   client.subscribe("smartplug/status");
+  client.subscribe("smartplug/fault");
+  client.subscribe("smartplug/relay");
 });
 
 let lastUpdate = Date.now();
+let isOn = false;
+let fault = false;
 
 client.on("message", (topic, message) => {
 
@@ -51,6 +55,29 @@ client.on("message", (topic, message) => {
   if (topic === "smartplug/status") {
     document.getElementById("status").innerText = message.toString();
   }
+
+ if (topic === "smartplug/fault") {
+
+  let msg = message.toString();
+
+  if (msg === "overcurrent") {
+    document.getElementById("status").innerText = "Overcurrent Trip";
+    fault = true;
+    isOn = false;
+  }
+
+  if (msg === "cleared") {
+    document.getElementById("status").innerText = "online";
+    fault = false;
+  }
+
+  updateButton();
+}
+  
+  if (topic === "smartplug/relay") {
+  isOn = message.toString() === "1";
+  updateButton();
+}
 });
 
 // ⏱️ watchdog
@@ -61,12 +88,29 @@ setInterval(() => {
 }, 1000);
   
 // 🔘 Control functions
-function turnOn() {
-  client.publish("smartplug/control", "1");
+function togglePlug() {
+
+  if (fault) {
+    alert("Fault active! Reset from device.");
+    return;
+  }
+
+  if (isOn) {
+    client.publish("smartplug/control", "0");
+  } else {
+    client.publish("smartplug/control", "1");
+  }
 }
 
-function turnOff() {
-  client.publish("smartplug/control", "0");
+function updateButton() {
+  const btn = document.getElementById("toggleBtn");
+
+  btn.innerText = isOn ? "ON" : "OFF";
+  btn.disabled = fault;
+}
+
+function resetFault() {
+  client.publish("smartplug/reset", "1");
 }
 
 </script>
