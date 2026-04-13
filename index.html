@@ -32,6 +32,7 @@ client.on("connect", () => {
 
   client.subscribe("smartplug/data");
   client.subscribe("smartplug/status");
+  client.subscribe("smartplug/fault");
 });
 
 let lastUpdate = Date.now();
@@ -51,6 +52,12 @@ client.on("message", (topic, message) => {
   if (topic === "smartplug/status") {
     document.getElementById("status").innerText = message.toString();
   }
+
+  if (topic === "smartplug/fault") {
+  document.getElementById("status").innerText = "Overcurrent Trip";
+  isOn = false;
+  updateButton();
+}
 });
 
 // ⏱️ watchdog
