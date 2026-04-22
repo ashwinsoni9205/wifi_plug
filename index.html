@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     :root {
-      --bg: #0b1220;
+      --bg: #0e0c4a;
       --bg-soft: #121a2b;
       --card: rgba(18, 26, 43, 0.86);
       --card-border: rgba(255,255,255,0.08);
@@ -510,6 +510,33 @@
               </div>
             </div>
 
+            <!-- TIMER SECTION -->
+            <div class="settings-grid" style="margin-top:16px;">
+              <div class="setting">
+                <label>Auto OFF (after minutes)</label>
+                <input id="timerMinutes" class="input" type="number" placeholder="e.g. 10" />
+              </div>
+
+              <div class="setting">
+                <label>&nbsp;</label>
+                <button class="btn primary" onclick="startCountdown()">Start Timer</button>
+              </div>
+
+              <div class="setting">
+                <label>Auto OFF at (exact time)</label>
+                <input id="exactTime" class="input" type="time" />
+              </div>
+
+              <div class="setting">
+                <label>&nbsp;</label>
+                <button class="btn primary" onclick="scheduleExactTime()">Schedule</button>
+              </div>
+            </div>
+
+            <div class="meta-row">
+              <div>Timer Status: <strong id="timerStatus">Not set</strong></div>
+            </div>
+
             <div class="meta-row" style="margin-top:18px;">
               <div>Estimated cost: <strong id="costValue">₹0.00</strong></div>
               <div>Session uptime: <strong id="sessionTime">0s</strong></div>
@@ -605,6 +632,9 @@
     let deviceOnline = false;
     let pendingCommand = false;
     let lastKnownStatus = "Unknown";
+    // TIMER STATE
+    let countdownTimer = null;
+    let scheduledTimer = null;
 
     const currentHistory = [];
     const powerHistory = [];
@@ -1017,6 +1047,7 @@
     // =========================
     // ACTIONS
     // =========================
+    clearTimers(); // reset timer when user toggles manually
     function togglePlug() {
       if (!brokerConnected) {
         alert("Broker is not connected.");
@@ -1092,6 +1123,105 @@
           ? "Load is active and power is being delivered"
           : "Load is idle and waiting for command";
     }, 1000);
+
+    // =========================
+    // TIMER FEATURES
+    // =========================
+
+    function clearTimers() {
+      if (countdownTimer) {
+        clearTimeout(countdownTimer);
+        countdownTimer = null;
+      }
+
+      if (scheduledTimer) {
+        clearTimeout(scheduledTimer);
+        scheduledTimer = null;
+      }
+
+      document.getElementById("timerStatus").textContent = "Not set";
+    }
+
+    // ⏱ Countdown Timer
+    function startCountdown() {
+      const minutes = parseInt(document.getElementById("timerMinutes").value);
+
+      if (!minutes || minutes <= 0) {
+        alert("Enter valid minutes");
+        return;
+      }
+
+      if (!isOn) {
+        alert("Turn ON the plug first");
+        return;
+      }
+
+      clearTimers();
+
+      const ms = minutes * 60 * 1000;
+
+      document.getElementById("timerStatus").textContent =
+        `Will turn OFF in ${minutes} min`;
+
+      addLog(`Timer set: OFF in ${minutes} minutes`);
+
+      countdownTimer = setTimeout(() => {
+        autoTurnOff("Countdown finished");
+      }, ms);
+    }
+
+    // 🕒 Exact Time Scheduler
+    function scheduleExactTime() {
+      const timeInput = document.getElementById("exactTime").value;
+
+      if (!timeInput) {
+        alert("Select time");
+        return;
+      }
+
+      if (!isOn) {
+        alert("Turn ON the plug first");
+        return;
+      }
+
+      clearTimers();
+
+      const now = new Date();
+      const [hours, minutes] = timeInput.split(":");
+
+      let target = new Date();
+      target.setHours(hours, minutes, 0, 0);
+
+      if (target <= now) {
+        target.setDate(target.getDate() + 1);
+      }
+
+      const diff = target - now;
+
+      document.getElementById("timerStatus").textContent =
+        `Will turn OFF at ${timeInput}`;
+
+      addLog(`Scheduled OFF at ${timeInput}`);
+
+      scheduledTimer = setTimeout(() => {
+        autoTurnOff("Scheduled time reached");
+      }, diff);
+    }
+
+    // 🔥 Auto OFF
+    function autoTurnOff(reason) {
+      if (!client || !brokerConnected) {
+        addLog("Auto OFF failed: Broker not connected");
+        return;
+      }
+
+      if (!isOn) return;
+
+      client.publish("smartplug/control", "0");
+
+      addLog(`Auto OFF executed: ${reason}`);
+      document.getElementById("timerStatus").textContent = "Completed";
+    }
 
     // =========================
     // START
